@@ -2,6 +2,9 @@
 
 source 'https://rubygems.org'
 
+# Core Ruby libraries (required for Ruby 3.4+)
+gem 'base64', '~> 0.2'
+
 # Testing framework
 gem 'rspec', '~> 3.13'
 

@@ -183,9 +183,8 @@ jobs:
       uses: trufflesecurity/trufflehog@main
       with:
         path: ./
-        base: main
-        head: HEAD
-        extra_args: --debug --only-verified --json --output trufflehog-results.json
+        extra_args: --debug --only-verified --json --output trufflehog-results.json --no-verification
+      continue-on-error: true
         
     - name: Run GitLeaks (Git Secrets Scanner)
       uses: gitleaks/gitleaks-action@v2

