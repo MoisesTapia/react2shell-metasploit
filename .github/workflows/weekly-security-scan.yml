@@ -241,8 +241,8 @@ jobs:
     - name: Run RuboCop Security
       run: |
         echo "🔍 Running RuboCop security analysis..."
-        rubocop --only Security --format json --out security-results/rubocop-security.json || true
-        rubocop --only Security > security-results/rubocop-security.txt || true
+        bundle exec rubocop --only Security --format json --out security-results/rubocop-security.json || true
+        bundle exec rubocop --only Security > security-results/rubocop-security.txt || true
         echo "✅ RuboCop security analysis completed"
         
     - name: Run Reek (Code Smells)

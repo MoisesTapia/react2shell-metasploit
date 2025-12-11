@@ -1,8 +1,8 @@
 # RuboCop Configuration for React2Shell Metasploit Module
 
-require:
+# Use plugins instead of require for modern RuboCop
+plugins:
   - rubocop-performance
-  - rubocop-security
 
 AllCops:
   TargetRubyVersion: 2.7
@@ -70,18 +70,34 @@ Naming/MethodParameterName:
   MinNameLength: 2
   AllowNamesEndingInNumbers: true
 
-# Security (High Priority)
+# Security (Built-in RuboCop Security Rules)
 Security/Eval:
   Enabled: true
+  Severity: error
 
-Security/Open:
+Security/JSONLoad:
   Enabled: true
-
-Security/YAMLLoad:
-  Enabled: true
+  Severity: warning
 
 Security/MarshalLoad:
   Enabled: true
+  Severity: error
+
+Security/Open:
+  Enabled: true
+  Severity: error
+
+Security/YAMLLoad:
+  Enabled: true
+  Severity: warning
+
+Security/CompoundHash:
+  Enabled: true
+  Severity: warning
+
+Security/IoMethods:
+  Enabled: true
+  Severity: warning
 
 # Style
 Style/Documentation:
@@ -182,7 +198,7 @@ Lint/EmptyEnsure:
 Lint/EmptyInterpolation:
   Enabled: true
 
-Lint/EndInMethod:
+Style/EndBlock:
   Enabled: true
 
 Lint/EnsureReturn:
@@ -227,7 +243,7 @@ Lint/UselessAccessModifier:
 Lint/UselessAssignment:
   Enabled: true
 
-Lint/UselessComparison:
+Lint/BinaryOperatorWithIdenticalOperands:
   Enabled: true
 
 Lint/UselessElseWithoutRescue:

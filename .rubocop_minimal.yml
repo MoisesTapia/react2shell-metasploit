@@ -1,0 +1,83 @@
+# Minimal RuboCop Configuration for CI
+# Used when rubocop-performance and rubocop-security are not available
+
+AllCops:
+  TargetRubyVersion: 2.7
+  NewCops: enable
+  Exclude:
+    - 'vendor/**/*'
+    - '.bundle/**/*'
+    - 'tmp/**/*'
+    - 'spec/fixtures/**/*'
+    - 'node_modules/**/*'
+
+# Layout and Formatting
+Layout/LineLength:
+  Max: 120
+  AllowedPatterns: ['\A\s*#'] # Allow long comments
+
+# Metrics
+Metrics/AbcSize:
+  Max: 25
+  Exclude:
+    - 'spec/**/*'
+
+Metrics/BlockLength:
+  Max: 50
+  Exclude:
+    - 'spec/**/*'
+    - 'Rakefile'
+
+Metrics/ClassLength:
+  Max: 200
+  Exclude:
+    - 'spec/**/*'
+
+Metrics/CyclomaticComplexity:
+  Max: 10
+
+Metrics/MethodLength:
+  Max: 30
+  Exclude:
+    - 'spec/**/*'
+
+# Naming
+Naming/FileName:
+  Exclude:
+    - 'react2shell_rce.rb' # Metasploit module naming convention
+
+# Style
+Style/Documentation:
+  Enabled: false # Disable for now
+
+Style/FrozenStringLiteralComment:
+  Enabled: true
+  EnforcedStyle: always
+
+Style/StringLiterals:
+  EnforcedStyle: single_quotes
+
+# Security (Built-in RuboCop Security Rules)
+Security/Eval:
+  Enabled: true
+
+Security/JSONLoad:
+  Enabled: true
+
+Security/MarshalLoad:
+  Enabled: true
+
+Security/Open:
+  Enabled: true
+
+Security/YAMLLoad:
+  Enabled: true
+
+# Metasploit-specific adjustments
+Style/MixinUsage:
+  Exclude:
+    - 'react2shell_rce.rb' # Metasploit modules use include at top level
+
+Lint/MissingSuper:
+  Exclude:
+    - 'react2shell_rce.rb' # Metasploit modules don't always call super
