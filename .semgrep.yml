@@ -1,0 +1,183 @@
+# Semgrep Configuration for React2Shell Metasploit Module
+# Static Application Security Testing (SAST) rules
+
+rules:
+  # Custom rules for security tools
+  - id: hardcoded-secret-detection
+    pattern-either:
+      - pattern: |
+          $VAR = "..."
+      - pattern: |
+          $VAR = '...'
+    pattern-where-python: |
+      import re
+      def check(vars):
+          secret_patterns = [
+              r'(?i)(password|passwd|pwd|secret|key|token|api_key|auth)',
+              r'[A-Za-z0-9]{20,}',  # Long alphanumeric strings
+              r'[A-Fa-f0-9]{32,}',  # Hex strings (hashes, keys)
+          ]
+          value = vars.get('$VAR', '')
+          return any(re.search(pattern, str(value)) for pattern in secret_patterns)
+    message: Potential hardcoded secret detected
+    severity: WARNING
+    languages: [ruby]
+    
+  - id: command-injection-risk
+    patterns:
+      - pattern-either:
+          - pattern: system($CMD)
+          - pattern: exec($CMD)
+          - pattern: `$CMD`
+          - pattern: %x[$CMD]
+          - pattern: IO.popen($CMD)
+          - pattern: Open3.capture3($CMD)
+      - pattern-not: system("...")
+      - pattern-not: exec("...")
+    message: Potential command injection vulnerability - ensure input is properly sanitized
+    severity: ERROR
+    languages: [ruby]
+    
+  - id: sql-injection-risk
+    patterns:
+      - pattern-either:
+          - pattern: |
+              $DB.execute("... #{$VAR} ...")
+          - pattern: |
+              $DB.query("... #{$VAR} ...")
+          - pattern: |
+              "SELECT ... #{$VAR} ..."
+          - pattern: |
+              "INSERT ... #{$VAR} ..."
+          - pattern: |
+              "UPDATE ... #{$VAR} ..."
+          - pattern: |
+              "DELETE ... #{$VAR} ..."
+    message: Potential SQL injection vulnerability - use parameterized queries
+    severity: ERROR
+    languages: [ruby]
+    
+  - id: path-traversal-risk
+    patterns:
+      - pattern-either:
+          - pattern: File.read($PATH)
+          - pattern: File.open($PATH)
+          - pattern: IO.read($PATH)
+          - pattern: Pathname.new($PATH)
+      - pattern-where-python: |
+          def check(vars):
+              path = vars.get('$PATH', '')
+              dangerous_patterns = ['../', '..\\', '/etc/', '/proc/', '/sys/']
+              return any(pattern in str(path) for pattern in dangerous_patterns)
+    message: Potential path traversal vulnerability - validate file paths
+    severity: ERROR
+    languages: [ruby]
+    
+  - id: unsafe-deserialization
+    patterns:
+      - pattern-either:
+          - pattern: Marshal.load($DATA)
+          - pattern: YAML.load($DATA)
+          - pattern: JSON.parse($DATA)
+      - pattern-not: JSON.parse("...")
+      - pattern-not: YAML.load("...")
+    message: Unsafe deserialization - validate input data
+    severity: WARNING
+    languages: [ruby]
+    
+  - id: weak-crypto-usage
+    patterns:
+      - pattern-either:
+          - pattern: Digest::MD5.hexdigest($DATA)
+          - pattern: Digest::SHA1.hexdigest($DATA)
+          - pattern: OpenSSL::Cipher.new("DES")
+          - pattern: OpenSSL::Cipher.new("RC4")
+    message: Weak cryptographic algorithm detected - use stronger alternatives
+    severity: WARNING
+    languages: [ruby]
+    
+  - id: information-disclosure
+    patterns:
+      - pattern-either:
+          - pattern: puts $ERROR.backtrace
+          - pattern: print $ERROR.message
+          - pattern: logger.error $ERROR.backtrace
+      - pattern-inside: |
+          rescue $EXCEPTION => $ERROR
+            ...
+    message: Potential information disclosure through error messages
+    severity: INFO
+    languages: [ruby]
+    
+  - id: unsafe-redirect
+    patterns:
+      - pattern-either:
+          - pattern: redirect_to $URL
+          - pattern: response.redirect $URL
+      - pattern-not: redirect_to "..."
+    message: Potential open redirect vulnerability - validate URLs
+    severity: WARNING
+    languages: [ruby]
+    
+  - id: missing-input-validation
+    patterns:
+      - pattern-either:
+          - pattern: |
+              def $METHOD($PARAM)
+                system($PARAM)
+          - pattern: |
+              def $METHOD($PARAM)
+                exec($PARAM)
+          - pattern: |
+              def $METHOD($PARAM)
+                File.read($PARAM)
+    message: Missing input validation for potentially dangerous operation
+    severity: WARNING
+    languages: [ruby]
+    
+  - id: debug-code-left
+    patterns:
+      - pattern-either:
+          - pattern: puts "DEBUG: ..."
+          - pattern: p $VAR
+          - pattern: pp $VAR
+          - pattern: binding.pry
+          - pattern: debugger
+    message: Debug code should not be left in production
+    severity: INFO
+    languages: [ruby]
+
+# Include additional rulesets
+include:
+  # OWASP Top 10 rules
+  - https://semgrep.dev/p/owasp-top-ten
+  
+  # Ruby security rules
+  - https://semgrep.dev/p/ruby
+  
+  # Security audit rules
+  - https://semgrep.dev/p/security-audit
+  
+  # CWE Top 25 rules
+  - https://semgrep.dev/p/cwe-top-25
+  
+  # Command injection rules
+  - https://semgrep.dev/p/command-injection
+  
+  # SQL injection rules
+  - https://semgrep.dev/p/sql-injection
+
+# Exclude patterns
+exclude:
+  - "*.min.js"
+  - "vendor/"
+  - ".bundle/"
+  - "tmp/"
+  - "spec/fixtures/"
+  - "node_modules/"
+
+# Severity levels
+severity:
+  - ERROR    # Critical security issues
+  - WARNING  # Important security concerns
+  - INFO     # Code quality and best practices

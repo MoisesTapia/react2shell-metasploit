@@ -46,7 +46,7 @@ jobs:
         bundle exec rspec --tag integration --format documentation
         
     - name: Upload test results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: test-results-ruby-${{ matrix.ruby-version }}
@@ -57,7 +57,7 @@ jobs:
         bundle exec rspec --format html --out tmp/coverage.html
         
     - name: Upload coverage reports
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: coverage-report-ruby-${{ matrix.ruby-version }}
         path: tmp/coverage.html
@@ -105,7 +105,7 @@ jobs:
         cat tmp/flog_results.txt
         
     - name: Upload lint results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: lint-results
@@ -152,7 +152,7 @@ jobs:
         extra_args: --debug --only-verified
         
     - name: Upload security results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: security-basic-results
@@ -185,7 +185,7 @@ jobs:
         cat tmp/undocumented.txt
         
     - name: Upload documentation
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: documentation
         path: |

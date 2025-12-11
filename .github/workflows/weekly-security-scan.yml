@@ -74,22 +74,22 @@ jobs:
         generateSarif: "1"
         
     - name: Upload Semgrep results to GitHub Security
-      uses: github/codeql-action/upload-sarif@v2
+      uses: github/codeql-action/upload-sarif@v3
       if: always()
       with:
         sarif_file: semgrep.sarif
         
     - name: Run CodeQL Analysis
-      uses: github/codeql-action/init@v2
+      uses: github/codeql-action/init@v3
       with:
         languages: ruby
         queries: security-and-quality
         
     - name: Autobuild
-      uses: github/codeql-action/autobuild@v2
+      uses: github/codeql-action/autobuild@v3
       
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v2
+      uses: github/codeql-action/analyze@v3
       with:
         category: "/language:ruby"
         
@@ -164,7 +164,7 @@ jobs:
         echo "✅ License compliance check completed"
         
     - name: Upload dependency results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: dependency-analysis-results
         path: security-results/
@@ -275,7 +275,7 @@ jobs:
       uses: actions/checkout@v4
       
     - name: Download all artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       
     - name: Generate comprehensive security report
       run: |
@@ -339,7 +339,7 @@ jobs:
         echo "✅ Security report generated"
         
     - name: Upload comprehensive security report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: weekly-security-report-$(date +%Y%m%d)
         path: |
