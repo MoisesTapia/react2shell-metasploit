@@ -1,0 +1,97 @@
+# Dependabot configuration for React2Shell Metasploit Module
+# Automated dependency updates
+
+version: 2
+
+updates:
+  # Ruby dependencies (Bundler)
+  - package-ecosystem: "bundler"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "security-team"
+    assignees:
+      - "maintainer"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "security"
+    milestone: "Security Updates"
+    
+    # Security updates
+    allow:
+      - dependency-type: "direct"
+        update-type: "security"
+      - dependency-type: "indirect"
+        update-type: "security"
+      - dependency-type: "direct"
+        update-type: "version-update:semver-patch"
+      - dependency-type: "direct"
+        update-type: "version-update:semver-minor"
+    
+    # Ignore specific dependencies if needed
+    ignore:
+      # Example: ignore major version updates for stable dependencies
+      # - dependency-name: "rspec"
+      #   update-types: ["version-update:semver-major"]
+    
+    # Groups for related dependencies
+    groups:
+      testing:
+        patterns:
+          - "rspec*"
+          - "*-rspec"
+          - "simplecov*"
+          - "factory_bot*"
+        
+      security:
+        patterns:
+          - "brakeman"
+          - "bundler-audit"
+          - "*security*"
+        
+      linting:
+        patterns:
+          - "rubocop*"
+          - "reek"
+          - "flay"
+          - "flog"
+    
+    # Custom commit messages for different types
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+      include: "scope"
+
+  # GitHub Actions dependencies
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "security-team"
+    assignees:
+      - "maintainer"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "github-actions"
+      - "ci-cd"
+    
+    # Allow all updates for GitHub Actions
+    allow:
+      - dependency-type: "direct"
+      - dependency-type: "indirect"

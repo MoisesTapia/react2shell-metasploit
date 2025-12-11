@@ -1,0 +1,235 @@
+# Reek Configuration for React2Shell Metasploit Module
+# Code smell detection configuration
+
+exclude_paths:
+  - vendor
+  - .bundle
+  - tmp
+  - spec/fixtures
+
+detectors:
+  # Attribute smells
+  Attribute:
+    enabled: true
+    exclude: []
+
+  # Boolean parameter smells
+  BooleanParameter:
+    enabled: true
+    exclude: []
+
+  # Built-in type checking smells
+  BuiltinIteratorProtocol:
+    enabled: true
+    exclude: []
+
+  # Class variable smells
+  ClassVariable:
+    enabled: true
+    exclude: []
+
+  # Control parameter smells
+  ControlParameter:
+    enabled: true
+    exclude: []
+
+  # Data clump smells
+  DataClump:
+    enabled: true
+    exclude: []
+    max_copies: 2
+    min_clump_size: 2
+
+  # Duplicate method call smells
+  DuplicateMethodCall:
+    enabled: true
+    exclude: []
+    max_calls: 2
+    allow_calls: []
+
+  # Feature envy smells
+  FeatureEnvy:
+    enabled: true
+    exclude: []
+
+  # Instance variable assumption smells
+  InstanceVariableAssumption:
+    enabled: true
+    exclude: []
+
+  # Irresponsible module smells
+  IrresponsibleModule:
+    enabled: false # Disabled for Metasploit modules
+
+  # Large class smells
+  LargeClass:
+    enabled: true
+    exclude: []
+    max_methods: 25
+    max_instance_variables: 9
+
+  # Long method smells
+  LongMethod:
+    enabled: true
+    exclude: []
+    max_statements: 15
+
+  # Long parameter list smells
+  LongParameterList:
+    enabled: true
+    exclude: []
+    max_params: 4
+    overrides:
+      initialize: 5
+
+  # Long yield list smells
+  LongYieldList:
+    enabled: true
+    exclude: []
+    max_params: 3
+
+  # Manual dispatch smells
+  ManualDispatch:
+    enabled: true
+    exclude: []
+
+  # Missing safe method smells
+  MissingSafeMethod:
+    enabled: false # Disabled for security tools
+
+  # Module initialize smells
+  ModuleInitialize:
+    enabled: true
+    exclude: []
+
+  # Nested iterators smells
+  NestedIterators:
+    enabled: true
+    exclude: []
+    max_allowed_nesting: 1
+    ignore_iterators: []
+
+  # Nil check smells
+  NilCheck:
+    enabled: true
+    exclude: []
+
+  # Prima donna method smells
+  PrimaDonnaMethod:
+    enabled: true
+    exclude: []
+
+  # Repeated conditional smells
+  RepeatedConditional:
+    enabled: true
+    exclude: []
+    max_ifs: 2
+
+  # Subclassed from core class smells
+  SubclassedFromCoreClass:
+    enabled: true
+    exclude: []
+
+  # Too many constants smells
+  TooManyConstants:
+    enabled: true
+    exclude: []
+    max_constants: 5
+
+  # Too many instance variables smells
+  TooManyInstanceVariables:
+    enabled: true
+    exclude: []
+    max_instance_variables: 9
+
+  # Too many methods smells
+  TooManyMethods:
+    enabled: true
+    exclude: []
+    max_methods: 25
+
+  # Too many statements smells
+  TooManyStatements:
+    enabled: true
+    exclude: []
+    max_statements: 15
+
+  # Uncommunicative method name smells
+  UncommunicativeMethodName:
+    enabled: true
+    exclude: []
+    reject:
+      - !ruby/regexp /^[a-z]$/
+      - !ruby/regexp /[0-9]$/
+      - !ruby/regexp /[A-Z]/
+    accept: []
+
+  # Uncommunicative module name smells
+  UncommunicativeModuleName:
+    enabled: true
+    exclude: []
+    reject:
+      - !ruby/regexp /^.$/
+      - !ruby/regexp /[0-9]$/
+    accept:
+      - Msf # Metasploit framework
+
+  # Uncommunicative parameter name smells
+  UncommunicativeParameterName:
+    enabled: true
+    exclude: []
+    reject:
+      - !ruby/regexp /^.$/
+      - !ruby/regexp /[0-9]$/
+      - !ruby/regexp /[A-Z]/
+    accept: []
+
+  # Uncommunicative variable name smells
+  UncommunicativeVariableName:
+    enabled: true
+    exclude: []
+    reject:
+      - !ruby/regexp /^.$/
+      - !ruby/regexp /[0-9]$/
+      - !ruby/regexp /[A-Z]/
+    accept: []
+
+  # Unused parameters smells
+  UnusedParameters:
+    enabled: true
+    exclude: []
+
+  # Unused private method smells
+  UnusedPrivateMethod:
+    enabled: true
+    exclude: []
+
+  # Utility function smells
+  UtilityFunction:
+    enabled: true
+    exclude: []
+    public_methods_only: false
+
+# Directory-specific configurations
+directories:
+  "lib/react2shell":
+    IrresponsibleModule:
+      enabled: false
+    TooManyMethods:
+      max_methods: 30
+    LargeClass:
+      max_methods: 30
+
+  "spec":
+    IrresponsibleModule:
+      enabled: false
+    TooManyMethods:
+      enabled: false
+    LongMethod:
+      enabled: false
+    TooManyStatements:
+      enabled: false
+    DuplicateMethodCall:
+      enabled: false
+    UtilityFunction:
+      enabled: false

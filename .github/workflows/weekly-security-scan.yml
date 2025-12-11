@@ -1,0 +1,412 @@
+name: Weekly Security Scan
+
+on:
+  schedule:
+    # Run every Friday at 2:00 AM UTC (cron: minute hour day-of-month month day-of-week)
+    - cron: '0 2 * * 5'
+  workflow_dispatch:
+    inputs:
+      scan_type:
+        description: 'Type of security scan to run'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+        - full
+        - sast-only
+        - dependency-only
+        - secrets-only
+
+env:
+  RUBY_VERSION: '3.1'
+
+jobs:
+  sast-analysis:
+    name: Static Application Security Testing (SAST)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ env.RUBY_VERSION }}
+        bundler-cache: true
+        
+    - name: Install security analysis tools
+      run: |
+        gem install brakeman bundler-audit semgrep
+        bundle install
+        
+    - name: Create results directory
+      run: mkdir -p security-results
+        
+    - name: Run Brakeman (Ruby Security Scanner)
+      run: |
+        echo "🔍 Running Brakeman security analysis..."
+        brakeman --format json --output security-results/brakeman-results.json --confidence-level 1 --no-exit-on-warn --no-exit-on-error
+        brakeman --format text --confidence-level 1 > security-results/brakeman-report.txt
+        echo "✅ Brakeman analysis completed"
+        
+    - name: Run Bundler Audit (Dependency Vulnerabilities)
+      run: |
+        echo "🔍 Checking for vulnerable dependencies..."
+        bundle audit check --update --format json --output security-results/bundler-audit.json || true
+        bundle audit check --update > security-results/bundler-audit.txt || true
+        echo "✅ Dependency audit completed"
+        
+    - name: Run Semgrep (Multi-language SAST)
+      uses: returntocorp/semgrep-action@v1
+      with:
+        config: >-
+          p/security-audit
+          p/ruby
+          p/owasp-top-ten
+          p/cwe-top-25
+        generateSarif: "1"
+        
+    - name: Upload Semgrep results to GitHub Security
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: semgrep.sarif
+        
+    - name: Run CodeQL Analysis
+      uses: github/codeql-action/init@v2
+      with:
+        languages: ruby
+        queries: security-and-quality
+        
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@v2
+      
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
+      with:
+        category: "/language:ruby"
+        
+    - name: Run custom security checks
+      run: |
+        echo "🔍 Running custom security checks..."
+        
+        # Check for hardcoded secrets patterns
+        echo "Checking for hardcoded secrets..."
+        grep -r -i -E "(password|secret|key|token|api_key)" lib/ --include="*.rb" > security-results/potential-secrets.txt || true
+        
+        # Check for dangerous Ruby methods
+        echo "Checking for dangerous Ruby methods..."
+        grep -r -E "(eval|system|exec|`|\%x)" lib/ --include="*.rb" > security-results/dangerous-methods.txt || true
+        
+        # Check for SQL injection patterns
+        echo "Checking for potential SQL injection..."
+        grep -r -E "(SELECT|INSERT|UPDATE|DELETE).*\#{" lib/ --include="*.rb" > security-results/sql-injection.txt || true
+        
+        # Check for command injection patterns
+        echo "Checking for potential command injection..."
+        grep -r -E "system\(.*\#{|exec\(.*\#{|\`.*\#{" lib/ --include="*.rb" > security-results/command-injection.txt || true
+        
+        # Check for file inclusion vulnerabilities
+        echo "Checking for file inclusion vulnerabilities..."
+        grep -r -E "(require|load|File\.read|File\.open).*\#{" lib/ --include="*.rb" > security-results/file-inclusion.txt || true
+        
+        echo "✅ Custom security checks completed"
+
+  dependency-analysis:
+    name: Dependency Security Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ env.RUBY_VERSION }}
+        bundler-cache: true
+        
+    - name: Install dependency analysis tools
+      run: |
+        gem install bundler-audit license_finder
+        bundle install
+        
+    - name: Create results directory
+      run: mkdir -p security-results
+        
+    - name: Run comprehensive dependency audit
+      run: |
+        echo "🔍 Running comprehensive dependency analysis..."
+        
+        # Check for known vulnerabilities
+        bundle audit check --update --verbose > security-results/dependency-vulnerabilities.txt || true
+        
+        # Generate dependency tree
+        bundle list > security-results/dependency-list.txt
+        
+        # Check for outdated gems
+        bundle outdated > security-results/outdated-gems.txt || true
+        
+        echo "✅ Dependency analysis completed"
+        
+    - name: License compliance check
+      run: |
+        echo "🔍 Checking license compliance..."
+        license_finder --format text > security-results/license-report.txt || true
+        license_finder --format json > security-results/license-report.json || true
+        echo "✅ License compliance check completed"
+        
+    - name: Upload dependency results
+      uses: actions/upload-artifact@v3
+      with:
+        name: dependency-analysis-results
+        path: security-results/
+
+  secrets-scanning:
+    name: Secrets and Sensitive Data Scanning
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Run TruffleHog (Secrets Scanner)
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
+        base: main
+        head: HEAD
+        extra_args: --debug --only-verified --json --output trufflehog-results.json
+        
+    - name: Run GitLeaks (Git Secrets Scanner)
+      uses: gitleaks/gitleaks-action@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+        
+    - name: Custom secrets patterns check
+      run: |
+        echo "🔍 Running custom secrets pattern detection..."
+        mkdir -p security-results
+        
+        # Check for various secret patterns
+        echo "Checking for API keys..."
+        grep -r -i -E "api[_-]?key.*['\"][a-zA-Z0-9]{20,}['\"]" . --exclude-dir=.git > security-results/api-keys.txt || true
+        
+        echo "Checking for passwords..."
+        grep -r -i -E "password.*['\"][^'\"]{8,}['\"]" . --exclude-dir=.git > security-results/passwords.txt || true
+        
+        echo "Checking for tokens..."
+        grep -r -i -E "token.*['\"][a-zA-Z0-9]{20,}['\"]" . --exclude-dir=.git > security-results/tokens.txt || true
+        
+        echo "Checking for private keys..."
+        grep -r -E "BEGIN (RSA |DSA |EC |OPENSSH )?PRIVATE KEY" . --exclude-dir=.git > security-results/private-keys.txt || true
+        
+        echo "Checking for database URLs..."
+        grep -r -E "(mysql|postgres|mongodb)://[^'\"\s]+" . --exclude-dir=.git > security-results/database-urls.txt || true
+        
+        echo "✅ Custom secrets scanning completed"
+
+  code-quality-security:
+    name: Code Quality Security Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ env.RUBY_VERSION }}
+        bundler-cache: true
+        
+    - name: Install code quality tools
+      run: |
+        gem install rubocop rubocop-performance rubocop-security reek flay flog
+        bundle install
+        
+    - name: Create results directory
+      run: mkdir -p security-results
+        
+    - name: Run RuboCop Security
+      run: |
+        echo "🔍 Running RuboCop security analysis..."
+        rubocop --only Security --format json --out security-results/rubocop-security.json || true
+        rubocop --only Security > security-results/rubocop-security.txt || true
+        echo "✅ RuboCop security analysis completed"
+        
+    - name: Run Reek (Code Smells)
+      run: |
+        echo "🔍 Running code smell analysis..."
+        reek --format json lib/ > security-results/reek-results.json || true
+        reek lib/ > security-results/reek-results.txt || true
+        echo "✅ Code smell analysis completed"
+        
+    - name: Run Flay (Code Duplication)
+      run: |
+        echo "🔍 Running code duplication analysis..."
+        flay lib/ > security-results/flay-results.txt || true
+        echo "✅ Code duplication analysis completed"
+        
+    - name: Run Flog (Code Complexity)
+      run: |
+        echo "🔍 Running code complexity analysis..."
+        flog --details lib/ > security-results/flog-results.txt || true
+        echo "✅ Code complexity analysis completed"
+
+  security-report:
+    name: Generate Security Report
+    runs-on: ubuntu-latest
+    needs: [sast-analysis, dependency-analysis, secrets-scanning, code-quality-security]
+    if: always()
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+      
+    - name: Generate comprehensive security report
+      run: |
+        echo "📊 Generating comprehensive security report..."
+        
+        # Create report directory
+        mkdir -p final-security-report
+        
+        # Generate summary report
+        cat > final-security-report/security-summary.md << 'EOF'
+        # Weekly Security Scan Report
+        
+        **Scan Date:** $(date)
+        **Repository:** ${{ github.repository }}
+        **Branch:** ${{ github.ref_name }}
+        **Commit:** ${{ github.sha }}
+        
+        ## Executive Summary
+        
+        This report contains the results of automated security scanning performed on the React2Shell Metasploit Module.
+        
+        ## Scan Coverage
+        
+        - ✅ Static Application Security Testing (SAST)
+        - ✅ Dependency Vulnerability Analysis
+        - ✅ Secrets and Sensitive Data Scanning
+        - ✅ Code Quality Security Analysis
+        
+        ## Tools Used
+        
+        - **Brakeman**: Ruby security scanner
+        - **Semgrep**: Multi-language SAST tool
+        - **CodeQL**: GitHub's semantic code analysis
+        - **Bundler Audit**: Ruby dependency vulnerability scanner
+        - **TruffleHog**: Secrets detection
+        - **GitLeaks**: Git secrets scanner
+        - **RuboCop Security**: Ruby security linting
+        
+        ## Results Summary
+        
+        Detailed results are available in the individual tool outputs.
+        
+        ## Recommendations
+        
+        1. Review all HIGH and CRITICAL severity findings
+        2. Update vulnerable dependencies
+        3. Remove any detected secrets or sensitive data
+        4. Address code quality issues that may impact security
+        
+        ## Next Steps
+        
+        - Schedule remediation for identified vulnerabilities
+        - Update security policies if needed
+        - Consider additional security measures for high-risk areas
+        
+        ---
+        
+        *This report was generated automatically by GitHub Actions*
+        EOF
+        
+        echo "✅ Security report generated"
+        
+    - name: Upload comprehensive security report
+      uses: actions/upload-artifact@v3
+      with:
+        name: weekly-security-report-$(date +%Y%m%d)
+        path: |
+          final-security-report/
+          security-results/
+        retention-days: 90
+        
+    - name: Create security issue (if vulnerabilities found)
+      uses: actions/github-script@v6
+      if: always()
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          
+          // Check if there are any security findings
+          let hasFindings = false;
+          const reportDir = 'security-results';
+          
+          if (fs.existsSync(reportDir)) {
+            const files = fs.readdirSync(reportDir);
+            for (const file of files) {
+              const content = fs.readFileSync(path.join(reportDir, file), 'utf8');
+              if (content.trim().length > 0 && !content.includes('No issues found')) {
+                hasFindings = true;
+                break;
+              }
+            }
+          }
+          
+          if (hasFindings) {
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🔒 Weekly Security Scan Results - ${new Date().toISOString().split('T')[0]}`,
+              body: `## Weekly Security Scan Results
+              
+              The automated security scan has detected potential security issues that require review.
+              
+              **Scan Date:** ${new Date().toISOString()}
+              **Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+              
+              ### Action Required
+              
+              1. Review the security scan artifacts
+              2. Assess the severity of findings
+              3. Create remediation plan for critical/high severity issues
+              4. Update dependencies and fix code issues as needed
+              
+              ### Artifacts
+              
+              Download the complete security report from the workflow artifacts.
+              
+              /cc @security-team`,
+              labels: ['security', 'weekly-scan', 'needs-review']
+            });
+          }
+
+  notify-security-team:
+    name: Notify Security Team
+    runs-on: ubuntu-latest
+    needs: [security-report]
+    if: always()
+    
+    steps:
+    - name: Send notification
+      run: |
+        echo "📧 Security scan completed for ${{ github.repository }}"
+        echo "Results are available in the workflow artifacts"
+        echo "Workflow URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

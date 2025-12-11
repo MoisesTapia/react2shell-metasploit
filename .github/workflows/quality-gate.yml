@@ -1,0 +1,513 @@
+name: Quality Gate
+
+on:
+  schedule:
+    # Run every Friday at 3:00 AM UTC (after security scan)
+    - cron: '0 3 * * 5'
+  workflow_dispatch:
+    inputs:
+      quality_level:
+        description: 'Quality gate level'
+        required: true
+        default: 'standard'
+        type: choice
+        options:
+        - minimal
+        - standard
+        - strict
+        - enterprise
+
+env:
+  RUBY_VERSION: '3.1'
+
+jobs:
+  code-metrics:
+    name: Code Quality Metrics
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ env.RUBY_VERSION }}
+        bundler-cache: true
+        
+    - name: Install quality tools
+      run: |
+        gem install rubocop rubocop-performance rubocop-security
+        gem install reek flay flog simplecov
+        gem install rubycritic rails_best_practices
+        bundle install
+        
+    - name: Create metrics directory
+      run: mkdir -p quality-metrics
+        
+    - name: Run RuboCop (Style and Performance)
+      run: |
+        echo "📊 Running RuboCop analysis..."
+        rubocop --format json --out quality-metrics/rubocop-full.json || true
+        rubocop --format html --out quality-metrics/rubocop-report.html || true
+        
+        # Generate metrics summary
+        rubocop --format offenses > quality-metrics/rubocop-offenses.txt || true
+        
+        echo "✅ RuboCop analysis completed"
+        
+    - name: Run Reek (Code Smells Detection)
+      run: |
+        echo "📊 Running Reek analysis..."
+        reek --format json lib/ > quality-metrics/reek-results.json || true
+        reek --format html lib/ > quality-metrics/reek-report.html || true
+        reek --format yaml lib/ > quality-metrics/reek-config.yml || true
+        
+        echo "✅ Reek analysis completed"
+        
+    - name: Run Flay (Code Duplication)
+      run: |
+        echo "📊 Running Flay analysis..."
+        flay --mass 16 lib/ > quality-metrics/flay-results.txt || true
+        
+        # Calculate duplication percentage
+        total_lines=$(find lib/ -name "*.rb" -exec wc -l {} + | tail -1 | awk '{print $1}')
+        duplicated_lines=$(flay --mass 16 lib/ | grep -E "^\s*[0-9]+" | awk '{sum += $1} END {print sum}' || echo "0")
+        duplication_percent=$(echo "scale=2; $duplicated_lines * 100 / $total_lines" | bc -l || echo "0")
+        echo "Duplication: $duplication_percent%" > quality-metrics/duplication-summary.txt
+        
+        echo "✅ Flay analysis completed"
+        
+    - name: Run Flog (Code Complexity)
+      run: |
+        echo "📊 Running Flog analysis..."
+        flog --all --details lib/ > quality-metrics/flog-results.txt || true
+        flog --score lib/ > quality-metrics/flog-scores.txt || true
+        
+        echo "✅ Flog analysis completed"
+        
+    - name: Run RubyCritic (Overall Quality)
+      run: |
+        echo "📊 Running RubyCritic analysis..."
+        rubycritic --format json --path quality-metrics/rubycritic lib/ || true
+        rubycritic --format html --path quality-metrics/rubycritic-html lib/ || true
+        
+        echo "✅ RubyCritic analysis completed"
+        
+    - name: Generate code metrics summary
+      run: |
+        echo "📊 Generating code metrics summary..."
+        
+        cat > quality-metrics/metrics-summary.md << 'EOF'
+        # Code Quality Metrics Report
+        
+        **Generated:** $(date)
+        **Repository:** ${{ github.repository }}
+        **Commit:** ${{ github.sha }}
+        
+        ## Overview
+        
+        This report provides comprehensive code quality metrics for the React2Shell Metasploit Module.
+        
+        ## Metrics Summary
+        
+        ### Lines of Code
+        ```
+        $(find lib/ -name "*.rb" -exec wc -l {} + | tail -1)
+        ```
+        
+        ### File Count
+        ```
+        Ruby files: $(find lib/ -name "*.rb" | wc -l)
+        Test files: $(find spec/ -name "*.rb" | wc -l)
+        Total files: $(find . -name "*.rb" -not -path "./.bundle/*" -not -path "./vendor/*" | wc -l)
+        ```
+        
+        ### Complexity Metrics
+        - See flog-results.txt for detailed complexity analysis
+        - See rubycritic report for overall quality score
+        
+        ### Code Duplication
+        - See flay-results.txt for duplication analysis
+        - See duplication-summary.txt for percentage
+        
+        ### Code Smells
+        - See reek-results.json for detailed code smell analysis
+        
+        ### Style Violations
+        - See rubocop-full.json for detailed style analysis
+        
+        ## Quality Gates
+        
+        ### Passing Criteria (Standard Level)
+        - [ ] RuboCop offenses < 50
+        - [ ] Code duplication < 5%
+        - [ ] Average method complexity < 10
+        - [ ] No critical code smells
+        - [ ] Test coverage > 80%
+        
+        ## Recommendations
+        
+        1. Address high-priority RuboCop violations
+        2. Refactor complex methods (Flog score > 25)
+        3. Eliminate code duplication
+        4. Fix critical and high-severity code smells
+        5. Improve test coverage for uncovered areas
+        
+        EOF
+        
+        echo "✅ Metrics summary generated"
+
+  test-coverage:
+    name: Test Coverage Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ env.RUBY_VERSION }}
+        bundler-cache: true
+        
+    - name: Install coverage tools
+      run: |
+        gem install simplecov simplecov-html simplecov-json
+        bundle install
+        
+    - name: Create coverage directory
+      run: mkdir -p coverage-analysis
+        
+    - name: Run tests with coverage
+      run: |
+        echo "📊 Running test coverage analysis..."
+        
+        # Set up SimpleCov
+        cat > coverage_helper.rb << 'EOF'
+        require 'simplecov'
+        require 'simplecov-html'
+        require 'simplecov-json'
+        
+        SimpleCov.formatters = [
+          SimpleCov::Formatter::HTMLFormatter,
+          SimpleCov::Formatter::JSONFormatter
+        ]
+        
+        SimpleCov.start do
+          add_filter '/spec/'
+          add_filter '/vendor/'
+          add_filter '/.bundle/'
+          
+          add_group 'Core Components', 'lib/react2shell'
+          add_group 'Main Module', 'react2shell_rce.rb'
+          
+          minimum_coverage 80
+          minimum_coverage_by_file 70
+        end
+        EOF
+        
+        # Run tests with coverage
+        COVERAGE=true bundle exec rspec --require ./coverage_helper.rb
+        
+        # Move coverage results
+        mv coverage/ coverage-analysis/ || true
+        
+        echo "✅ Test coverage analysis completed"
+        
+    - name: Generate coverage summary
+      run: |
+        echo "📊 Generating coverage summary..."
+        
+        if [ -f coverage-analysis/.resultset.json ]; then
+          coverage_percent=$(ruby -r json -e "
+            data = JSON.parse(File.read('coverage-analysis/.resultset.json'))
+            total_lines = 0
+            covered_lines = 0
+            data.each do |_, result|
+              result['coverage'].each do |_, lines|
+                lines.each do |line|
+                  if line.is_a?(Integer)
+                    total_lines += 1
+                    covered_lines += 1 if line > 0
+                  end
+                end
+              end
+            end
+            puts ((covered_lines.to_f / total_lines) * 100).round(2)
+          ")
+          
+          echo "Test Coverage: $coverage_percent%" > coverage-analysis/coverage-summary.txt
+        fi
+        
+        echo "✅ Coverage summary generated"
+
+  performance-analysis:
+    name: Performance Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ env.RUBY_VERSION }}
+        bundler-cache: true
+        
+    - name: Install performance tools
+      run: |
+        gem install benchmark-ips memory_profiler stackprof
+        bundle install
+        
+    - name: Create performance directory
+      run: mkdir -p performance-analysis
+        
+    - name: Run performance benchmarks
+      run: |
+        echo "📊 Running performance benchmarks..."
+        
+        ruby > performance-analysis/benchmark-results.txt << 'EOF'
+        require 'benchmark/ips'
+        require 'memory_profiler'
+        require_relative 'lib/react2shell/payload_generator'
+        require_relative 'lib/react2shell/configuration_manager'
+        require_relative 'lib/react2shell/exploit_engine'
+        
+        # Mock MSF module for testing
+        class MockMsfModule
+          def datastore
+            {
+              'RHOSTS' => '127.0.0.1',
+              'LHOST' => '127.0.0.1',
+              'FILEPATH' => '/etc/passwd'
+            }
+          end
+          
+          def print_status(msg); end
+          def print_good(msg); end
+          def print_error(msg); end
+        end
+        
+        mock_module = MockMsfModule.new
+        generator = React2Shell::PayloadGenerator.new(mock_module)
+        config = React2Shell::ConfigurationManager.new(mock_module)
+        
+        puts "=== Performance Benchmarks ==="
+        puts
+        
+        Benchmark.ips do |x|
+          x.config(time: 5, warmup: 2)
+          
+          x.report('payload_generation') do
+            generator.create_file_exfiltration_payload('/etc/passwd', 'http://example.com')
+          end
+          
+          x.report('javascript_escaping') do
+            generator.escape_javascript('test "string" with \'quotes\' and \n newlines')
+          end
+          
+          x.report('flight_chunk_generation') do
+            generator.generate_flight_chunk('console.log("test")')
+          end
+          
+          x.report('configuration_validation') do
+            config.validate_options
+          end
+          
+          x.compare!
+        end
+        
+        puts
+        puts "=== Memory Usage Analysis ==="
+        puts
+        
+        report = MemoryProfiler.report do
+          100.times do
+            generator.create_file_exfiltration_payload('/etc/passwd', 'http://example.com')
+            generator.escape_javascript('test string')
+            generator.generate_flight_chunk('console.log("test")')
+          end
+        end
+        
+        puts "Total allocated: #{report.total_allocated_memsize} bytes"
+        puts "Total retained: #{report.total_retained_memsize} bytes"
+        puts "Objects allocated: #{report.total_allocated}"
+        puts "Objects retained: #{report.total_retained}"
+        
+        EOF
+        
+        echo "✅ Performance benchmarks completed"
+
+  quality-gate-evaluation:
+    name: Quality Gate Evaluation
+    runs-on: ubuntu-latest
+    needs: [code-metrics, test-coverage, performance-analysis]
+    if: always()
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+      
+    - name: Evaluate quality gates
+      run: |
+        echo "🚪 Evaluating quality gates..."
+        
+        # Create evaluation directory
+        mkdir -p quality-gate-results
+        
+        # Initialize gate status
+        gate_status="PASSED"
+        failed_gates=""
+        
+        # Define quality thresholds based on input
+        quality_level="${{ github.event.inputs.quality_level || 'standard' }}"
+        
+        case $quality_level in
+          "minimal")
+            max_rubocop_offenses=100
+            max_duplication=10
+            min_coverage=60
+            max_complexity=15
+            ;;
+          "standard")
+            max_rubocop_offenses=50
+            max_duplication=5
+            min_coverage=80
+            max_complexity=10
+            ;;
+          "strict")
+            max_rubocop_offenses=20
+            max_duplication=3
+            min_coverage=90
+            max_complexity=8
+            ;;
+          "enterprise")
+            max_rubocop_offenses=10
+            max_duplication=2
+            min_coverage=95
+            max_complexity=6
+            ;;
+        esac
+        
+        echo "Quality Level: $quality_level" > quality-gate-results/evaluation.txt
+        echo "Thresholds:" >> quality-gate-results/evaluation.txt
+        echo "- Max RuboCop offenses: $max_rubocop_offenses" >> quality-gate-results/evaluation.txt
+        echo "- Max duplication: $max_duplication%" >> quality-gate-results/evaluation.txt
+        echo "- Min coverage: $min_coverage%" >> quality-gate-results/evaluation.txt
+        echo "- Max complexity: $max_complexity" >> quality-gate-results/evaluation.txt
+        echo "" >> quality-gate-results/evaluation.txt
+        
+        # Check RuboCop offenses (if results exist)
+        if [ -f quality-metrics/rubocop-offenses.txt ]; then
+          offenses=$(grep -E "^[0-9]+" quality-metrics/rubocop-offenses.txt | head -1 | awk '{print $1}' || echo "0")
+          echo "RuboCop offenses: $offenses (threshold: $max_rubocop_offenses)" >> quality-gate-results/evaluation.txt
+          if [ "$offenses" -gt "$max_rubocop_offenses" ]; then
+            gate_status="FAILED"
+            failed_gates="$failed_gates RuboCop"
+          fi
+        fi
+        
+        # Check code duplication (if results exist)
+        if [ -f quality-metrics/duplication-summary.txt ]; then
+          duplication=$(grep "Duplication:" quality-metrics/duplication-summary.txt | awk '{print $2}' | sed 's/%//' || echo "0")
+          echo "Code duplication: $duplication% (threshold: $max_duplication%)" >> quality-gate-results/evaluation.txt
+          if (( $(echo "$duplication > $max_duplication" | bc -l) )); then
+            gate_status="FAILED"
+            failed_gates="$failed_gates Duplication"
+          fi
+        fi
+        
+        # Check test coverage (if results exist)
+        if [ -f coverage-analysis/coverage-summary.txt ]; then
+          coverage=$(grep "Test Coverage:" coverage-analysis/coverage-summary.txt | awk '{print $3}' | sed 's/%//' || echo "0")
+          echo "Test coverage: $coverage% (threshold: $min_coverage%)" >> quality-gate-results/evaluation.txt
+          if (( $(echo "$coverage < $min_coverage" | bc -l) )); then
+            gate_status="FAILED"
+            failed_gates="$failed_gates Coverage"
+          fi
+        fi
+        
+        # Generate final report
+        echo "" >> quality-gate-results/evaluation.txt
+        echo "QUALITY GATE STATUS: $gate_status" >> quality-gate-results/evaluation.txt
+        
+        if [ "$gate_status" = "FAILED" ]; then
+          echo "Failed gates:$failed_gates" >> quality-gate-results/evaluation.txt
+          echo "❌ Quality gate FAILED"
+          exit 1
+        else
+          echo "✅ Quality gate PASSED"
+        fi
+        
+    - name: Upload quality gate results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: quality-gate-results-$(date +%Y%m%d)
+        path: |
+          quality-gate-results/
+          quality-metrics/
+          coverage-analysis/
+          performance-analysis/
+        retention-days: 30
+        
+    - name: Create quality report issue (if gate failed)
+      uses: actions/github-script@v6
+      if: failure()
+      with:
+        script: |
+          await github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: `📊 Quality Gate Failed - ${new Date().toISOString().split('T')[0]}`,
+            body: `## Quality Gate Failure Report
+            
+            The weekly quality gate evaluation has failed and requires attention.
+            
+            **Date:** ${new Date().toISOString()}
+            **Quality Level:** ${{ github.event.inputs.quality_level || 'standard' }}
+            **Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            
+            ### Action Required
+            
+            1. Review the quality metrics in the workflow artifacts
+            2. Address failing quality gates:
+               - RuboCop style violations
+               - Code duplication issues
+               - Test coverage gaps
+               - Code complexity problems
+            3. Implement improvements to meet quality standards
+            4. Re-run quality gate after fixes
+            
+            ### Quality Metrics
+            
+            Download the complete quality report from the workflow artifacts for detailed analysis.
+            
+            /cc @development-team`,
+            labels: ['quality', 'technical-debt', 'needs-attention']
+          });
+
+  notify-team:
+    name: Notify Development Team
+    runs-on: ubuntu-latest
+    needs: [quality-gate-evaluation]
+    if: always()
+    
+    steps:
+    - name: Send notification
+      run: |
+        if [ "${{ needs.quality-gate-evaluation.result }}" = "success" ]; then
+          echo "✅ Quality gate passed for ${{ github.repository }}"
+        else
+          echo "❌ Quality gate failed for ${{ github.repository }}"
+        fi
+        echo "Results are available in the workflow artifacts"
+        echo "Workflow URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

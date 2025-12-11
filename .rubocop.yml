@@ -1,0 +1,257 @@
+# RuboCop Configuration for React2Shell Metasploit Module
+
+require:
+  - rubocop-performance
+  - rubocop-security
+
+AllCops:
+  TargetRubyVersion: 2.7
+  NewCops: enable
+  Exclude:
+    - 'vendor/**/*'
+    - '.bundle/**/*'
+    - 'tmp/**/*'
+    - 'spec/fixtures/**/*'
+    - 'node_modules/**/*'
+
+# Layout and Formatting
+Layout/LineLength:
+  Max: 120
+  AllowedPatterns: ['\A\s*#'] # Allow long comments
+
+Layout/MultilineMethodCallIndentation:
+  EnforcedStyle: indented
+
+Layout/MultilineOperationIndentation:
+  EnforcedStyle: indented
+
+Layout/ParameterAlignment:
+  EnforcedStyle: with_fixed_indentation
+
+# Metrics
+Metrics/AbcSize:
+  Max: 25
+  Exclude:
+    - 'spec/**/*'
+
+Metrics/BlockLength:
+  Max: 50
+  Exclude:
+    - 'spec/**/*'
+    - 'Rakefile'
+
+Metrics/ClassLength:
+  Max: 200
+  Exclude:
+    - 'spec/**/*'
+
+Metrics/CyclomaticComplexity:
+  Max: 10
+
+Metrics/MethodLength:
+  Max: 30
+  Exclude:
+    - 'spec/**/*'
+
+Metrics/ModuleLength:
+  Max: 200
+  Exclude:
+    - 'spec/**/*'
+
+Metrics/PerceivedComplexity:
+  Max: 10
+
+# Naming
+Naming/FileName:
+  Exclude:
+    - 'react2shell_rce.rb' # Metasploit module naming convention
+
+Naming/MethodParameterName:
+  MinNameLength: 2
+  AllowNamesEndingInNumbers: true
+
+# Security (High Priority)
+Security/Eval:
+  Enabled: true
+
+Security/Open:
+  Enabled: true
+
+Security/YAMLLoad:
+  Enabled: true
+
+Security/MarshalLoad:
+  Enabled: true
+
+# Style
+Style/Documentation:
+  Enabled: false # Disable for now, enable in strict mode
+
+Style/FrozenStringLiteralComment:
+  Enabled: true
+  EnforcedStyle: always
+
+Style/StringLiterals:
+  EnforcedStyle: single_quotes
+  ConsistentQuotesInMultiline: true
+
+Style/TrailingCommaInArguments:
+  EnforcedStyleForMultiline: comma
+
+Style/TrailingCommaInArrayLiteral:
+  EnforcedStyleForMultiline: comma
+
+Style/TrailingCommaInHashLiteral:
+  EnforcedStyleForMultiline: comma
+
+Style/ClassAndModuleChildren:
+  EnforcedStyle: compact
+
+Style/EmptyMethod:
+  EnforcedStyle: expanded
+
+Style/Lambda:
+  EnforcedStyle: literal
+
+Style/NumericLiterals:
+  MinDigits: 6
+
+Style/PercentLiteralDelimiters:
+  PreferredDelimiters:
+    default: ()
+    '%i': '[]'
+    '%I': '[]'
+    '%r': '{}'
+    '%w': '[]'
+    '%W': '[]'
+
+Style/RegexpLiteral:
+  EnforcedStyle: slashes
+  AllowInnerSlashes: false
+
+Style/SymbolArray:
+  EnforcedStyle: brackets
+
+Style/WordArray:
+  EnforcedStyle: brackets
+
+# Performance
+Performance/Casecmp:
+  Enabled: true
+
+Performance/StringReplacement:
+  Enabled: true
+
+Performance/RedundantBlockCall:
+  Enabled: true
+
+Performance/RedundantMatch:
+  Enabled: true
+
+# Lint
+Lint/AmbiguousOperator:
+  Enabled: true
+
+Lint/AmbiguousRegexpLiteral:
+  Enabled: true
+
+Lint/AssignmentInCondition:
+  Enabled: true
+
+Lint/CircularArgumentReference:
+  Enabled: true
+
+Lint/DeprecatedClassMethods:
+  Enabled: true
+
+Lint/DuplicateHashKey:
+  Enabled: true
+
+Lint/DuplicateMethods:
+  Enabled: true
+
+Lint/EachWithObjectArgument:
+  Enabled: true
+
+Lint/ElseLayout:
+  Enabled: true
+
+Lint/EmptyEnsure:
+  Enabled: true
+
+Lint/EmptyInterpolation:
+  Enabled: true
+
+Lint/EndInMethod:
+  Enabled: true
+
+Lint/EnsureReturn:
+  Enabled: true
+
+Lint/FlipFlop:
+  Enabled: true
+
+Lint/LiteralAsCondition:
+  Enabled: true
+
+Lint/LiteralInInterpolation:
+  Enabled: true
+
+Lint/Loop:
+  Enabled: true
+
+Lint/ParenthesesAsGroupedExpression:
+  Enabled: true
+
+Lint/RequireParentheses:
+  Enabled: true
+
+Lint/RescueException:
+  Enabled: true
+
+Lint/ShadowingOuterLocalVariable:
+  Enabled: true
+
+Lint/UnderscorePrefixedVariableName:
+  Enabled: true
+
+Lint/UnusedBlockArgument:
+  Enabled: true
+
+Lint/UnusedMethodArgument:
+  Enabled: true
+
+Lint/UselessAccessModifier:
+  Enabled: true
+
+Lint/UselessAssignment:
+  Enabled: true
+
+Lint/UselessComparison:
+  Enabled: true
+
+Lint/UselessElseWithoutRescue:
+  Enabled: true
+
+Lint/UselessSetterCall:
+  Enabled: true
+
+Lint/Void:
+  Enabled: true
+
+# Custom rules for security tools
+Style/GlobalVars:
+  Enabled: true
+  AllowedVariables: []
+
+Style/ClassVars:
+  Enabled: true
+
+# Metasploit-specific adjustments
+Style/MixinUsage:
+  Exclude:
+    - 'react2shell_rce.rb' # Metasploit modules use include at top level
+
+Lint/MissingSuper:
+  Exclude:
+    - 'react2shell_rce.rb' # Metasploit modules don't always call super
